@@ -7,6 +7,7 @@ using UnityEngine;
 
 using static Unity.Mathematics.math;
 using quaternion = Unity.Mathematics.quaternion;
+using Random = UnityEngine.Random;
 
 class Fractal : MonoBehaviour {
 
@@ -41,8 +42,11 @@ class Fractal : MonoBehaviour {
 		}
 	}
 
-	[SerializeField, Range(1, 8)]
+	[SerializeField, Range(2, 8)]
 	int depth = 4;
+
+	[SerializeField]
+	Gradient gradientA, gradientB;
 
 	[SerializeField]
 	Mesh mesh;
@@ -71,13 +75,21 @@ class Fractal : MonoBehaviour {
 	}
 
 	ComputeBuffer[] matricesBuffers;
-	static readonly int matricesId = Shader.PropertyToID("_Matrices");
+	static readonly int 
+		colorAId = Shader.PropertyToID("_ColorA"),
+		colorBId = Shader.PropertyToID("_ColorB"),
+		matricesId = Shader.PropertyToID("_Matrices"),
+		sequenceNumbersId = Shader.PropertyToID("_SequenceNumbers");
 	static MaterialPropertyBlock propertyBlock;
+
+	Vector4[] sequenceNumbers;
 
 	void OnEnable () {
 		parts = new NativeArray<FractalPart>[depth];
 		matrices = new NativeArray<float3x4>[depth];
 		matricesBuffers = new ComputeBuffer[depth];
+
+		sequenceNumbers = new Vector4[depth];
 		int stride = 12 * 4; // Transformation matrices are 4x4 matrices of float values -- 16 x 4 bytes per float
 							 // ...Or they would be if the bottom row (0, 0, 0, 1) wasn't always the same. We can make them 3x4, which means 12 x 4 bytes per float 
 
@@ -85,6 +97,7 @@ class Fractal : MonoBehaviour {
 			parts[i] = new NativeArray<FractalPart>(length, Allocator.Persistent); // Arguments for NativeArray: Length, How long the array will exist
 			matrices[i] = new NativeArray<float3x4>(length, Allocator.Persistent); // Allocator.Persisent because we use the same arrays for every frame
 			matricesBuffers[i] = new ComputeBuffer(length, stride);
+			sequenceNumbers[i] = new Vector4(Random.value, Random.value);
 		}
 
 		parts[0][0] = CreatePart(0);
@@ -109,12 +122,13 @@ class Fractal : MonoBehaviour {
 		parts = null;
 		matrices = null;
 		matricesBuffers = null;
+		sequenceNumbers = null;
 	}
 
 	void OnValidate () { // Called whenever a change is made via the inspector or undo/redo action. EZ switching!
 		if (parts != null && enabled) { // Only reset if we're in play mode and not currently disabled
-			OnEnable();
 			OnDisable();
+			OnEnable();
 		}
 	}
 
@@ -159,6 +173,11 @@ class Fractal : MonoBehaviour {
 			ComputeBuffer buffer = matricesBuffers[i];
 
 			buffer.SetData(matrices[i]); // Upload matrix to the GPU
+
+			float gradientInterpolator = i / (matricesBuffers.Length - 1f);
+			propertyBlock.SetColor(colorAId, gradientA.Evaluate(gradientInterpolator));
+			propertyBlock.SetColor(colorBId, gradientB.Evaluate(gradientInterpolator));
+			propertyBlock.SetVector(sequenceNumbersId, sequenceNumbers[i]);
 			propertyBlock.SetBuffer(matricesId, buffer);
 			Graphics.DrawMeshInstancedProcedural(
 				mesh, 0, material, bounds, buffer.count, propertyBlock // New argument! Use the property block data to procedurally draw meshes
