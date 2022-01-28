@@ -752,8 +752,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_LocalRotation: {x: 5.2180482e-15, y: -0.7071067, z: 6.9876703e-15, w: 0.7071069}
-  m_LocalPosition: {x: 3.011793, y: 0.22580272, z: 0.027743636}
+  m_LocalRotation: {x: -0.07497156, y: -0.27167124, z: 0.021236762, w: -0.9592305}
+  m_LocalPosition: {x: -1.7265984, y: 0.42716265, z: -2.1135101}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -900,8 +900,8 @@ MonoBehaviour:
   depth: 8
   gradientA:
     serializedVersion: 2
-    key0: {r: 1, g: 1, b: 1, a: 1}
-    key1: {r: 1, g: 0, b: 0, a: 1}
+    key0: {r: 0.2830189, g: 0.2427005, b: 0.14284444, a: 0.3137255}
+    key1: {r: 0.6226415, g: 0.2741936, b: 0.15566038, a: 0.3529412}
     key2: {r: 0, g: 0, b: 0, a: 0}
     key3: {r: 0, g: 0, b: 0, a: 0}
     key4: {r: 0, g: 0, b: 0, a: 0}
@@ -909,7 +909,7 @@ MonoBehaviour:
     key6: {r: 0, g: 0, b: 0, a: 0}
     key7: {r: 0, g: 0, b: 0, a: 0}
     ctime0: 0
-    ctime1: 32768
+    ctime1: 65535
     ctime2: 65535
     ctime3: 0
     ctime4: 0
@@ -925,22 +925,22 @@ MonoBehaviour:
     atime6: 0
     atime7: 0
     m_Mode: 0
-    m_NumColorKeys: 3
+    m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   gradientB:
     serializedVersion: 2
-    key0: {r: 0, g: 0, b: 1, a: 1}
-    key1: {r: 1, g: 1, b: 1, a: 1}
-    key2: {r: 1, g: 1, b: 0, a: 0}
-    key3: {r: 0, g: 0, b: 0, a: 0}
+    key0: {r: 0.3018868, g: 0.29492274, b: 0.12388752, a: 0.54901963}
+    key1: {r: 0.3679245, g: 0.2739668, b: 0.1509879, a: 0.627451}
+    key2: {r: 0.3679245, g: 0.2739668, b: 0.1509879, a: 0}
+    key3: {r: 0.3679245, g: 0.2739668, b: 0.1509879, a: 0}
     key4: {r: 0, g: 0, b: 0, a: 0}
     key5: {r: 0, g: 0, b: 0, a: 0}
     key6: {r: 0, g: 0, b: 0, a: 0}
     key7: {r: 0, g: 0, b: 0, a: 0}
     ctime0: 0
-    ctime1: 32768
+    ctime1: 65535
     ctime2: 65535
-    ctime3: 0
+    ctime3: 65535
     ctime4: 0
     ctime5: 0
     ctime6: 0
@@ -954,9 +954,17 @@ MonoBehaviour:
     atime6: 0
     atime7: 0
     m_Mode: 0
-    m_NumColorKeys: 3
+    m_NumColorKeys: 2
     m_NumAlphaKeys: 2
+  leafColorA: {r: 0.40198803, g: 0.754717, b: 0.2741189, a: 0.49803922}
+  leafColorB: {r: 0.2516465, g: 0.31438497, b: 0.8207547, a: 0.92941177}
+  maxSagAngleA: 15
+  maxSagAngleB: 25
+  spinSpeedA: 0
+  spinSpeedB: 45
+  reverseSpinChance: 0.25
   mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  leafMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   material: {fileID: 2100000, guid: 4d3ef019ce44b9342be1a2365071150b, type: 2}
 --- !u!4 &1791550783
 Transform:
@@ -965,10 +973,10 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1791550781}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0.17364816, w: 0.9848078}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 5
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 20}

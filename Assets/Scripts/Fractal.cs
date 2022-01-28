@@ -16,6 +16,7 @@ class Fractal : MonoBehaviour {
 		
 		public float spinAngleDelta;
 		public float scale;
+		public float deltaTime;
 
 		[ReadOnly]
 		public NativeArray<FractalPart> parents;
@@ -27,13 +28,29 @@ class Fractal : MonoBehaviour {
 		public void Execute (int i) {
 			FractalPart parent = parents[i / 5];
 			FractalPart part = parts[i];
-			part.spinAngle += spinAngleDelta;
-			part.worldRotation = mul(parent.worldRotation, 
+			part.spinAngle += part.spinVelocity * deltaTime;
+
+			float3 upAxis = mul(mul(parent.worldRotation, part.rotation), up()); // Add the part's local rotation + its parent's world orientation to the global up
+			float3 sagAxis = cross(up(), upAxis); // cross method returns a vector perpendicular to both arguments
+			
+			float sagMagnitude = length(sagAxis);
+			quaternion baseRotation;
+			if (sagMagnitude > 0f) {
+				sagAxis /= sagMagnitude; // normalize; cross method does not return a unit vector (depending on arguments) -- vector / its magnitude = unit length vector!
+				quaternion sagRotation = quaternion.AxisAngle(sagAxis, part.maxSagAngle * sagMagnitude); // AxisAngle returns a quaternion with rotation {1} around axis {0} -- in this case, 45 degrees around the sag axis
+				baseRotation = mul(sagRotation, parent.worldRotation); // Add sag to the parent's world rotation, i.e. the non-sagged starting point
+			}
+			else {
+				baseRotation = parent.worldRotation; // If the part is pointing straight up (i.e. the difference between its up and global up is 0), the length of the sag axis will be 0. 
+													 // No good for normalization! This defaults to the parent's rotation (i.e. no sag), which makes sense!
+			}
+
+			part.worldRotation = mul(baseRotation, // used to be parent's world rotation 
 				mul(part.rotation, quaternion.RotateY(part.spinAngle))
 			); // "Adding" rotations via quaternion multiplication -- Second quat is applied first, first quat is applied second -- Order matters!
 			part.worldPosition = 
 				parent.worldPosition + 
-				mul(parent.worldRotation, (1.5f * scale * part.direction)); // Quaternion-vector multiplication! Rotation of the parent part affects the position of the child part -- duh!
+				mul(part.worldRotation, float3(0f, 1.5f * scale, 0f)); // Quaternion-vector multiplication! Rotation of the parent part affects the position of the child part -- duh!
 				// On parent -> move in direction multiplied by scale of part (scale is uniform so just using the x component is fine)
 
 			parts[i] = part;
@@ -42,21 +59,29 @@ class Fractal : MonoBehaviour {
 		}
 	}
 
-	[SerializeField, Range(2, 8)]
+	[SerializeField, Range(3, 8)] // We need to perform a -2 operation to buffer indices later on, so need 3 in order to avoid dividing by 0
 	int depth = 4;
 
 	[SerializeField]
 	Gradient gradientA, gradientB;
 
 	[SerializeField]
-	Mesh mesh;
+	Color leafColorA, leafColorB;
+
+	[SerializeField, Range(0f, 90f)]
+	float maxSagAngleA = 15f, maxSagAngleB = 25f;
+
+	[SerializeField, Range(0f, 90f)]
+	float spinSpeedA = 20f, spinSpeedB = 25f;
+
+	[SerializeField, Range(0f, 1f)]
+	float reverseSpinChance = 0.25f;
+
+	[SerializeField]
+	Mesh mesh, leafMesh;
 
 	[SerializeField]
 	Material material;
-
-	static float3[] directions = {
-		up(), right(), left(), forward(), back()
-	};
 
 	static quaternion[] rotations = {
 		quaternion.identity,
@@ -69,9 +94,9 @@ class Fractal : MonoBehaviour {
 	NativeArray<float3x4>[] matrices;
 
 	struct FractalPart {
-		public float3 direction, worldPosition;
+		public float3 worldPosition;
 		public quaternion rotation, worldRotation;
-		public float spinAngle;
+		public float maxSagAngle, spinAngle, spinVelocity;
 	}
 
 	ComputeBuffer[] matricesBuffers;
@@ -97,7 +122,7 @@ class Fractal : MonoBehaviour {
 			parts[i] = new NativeArray<FractalPart>(length, Allocator.Persistent); // Arguments for NativeArray: Length, How long the array will exist
 			matrices[i] = new NativeArray<float3x4>(length, Allocator.Persistent); // Allocator.Persisent because we use the same arrays for every frame
 			matricesBuffers[i] = new ComputeBuffer(length, stride);
-			sequenceNumbers[i] = new Vector4(Random.value, Random.value);
+			sequenceNumbers[i] = new Vector4(Random.value, Random.value, Random.value, Random.value);
 		}
 
 		parts[0][0] = CreatePart(0);
@@ -133,11 +158,11 @@ class Fractal : MonoBehaviour {
 	}
 
 	void Update () {
-		float spinAngleDelta = 0.125f * PI * Time.deltaTime;
+		float deltaTime = Time.deltaTime;
 		//spinAngleDelta = 0f;
 		
 		FractalPart rootPart = parts[0][0];
-		rootPart.spinAngle += spinAngleDelta; // Remember quat "multiplication" -- root part rotation * delta rotation = root part rotation applied on top of delta rotation
+		rootPart.spinAngle += rootPart.spinVelocity * deltaTime; // Remember quat "multiplication" -- root part rotation * delta rotation = root part rotation applied on top of delta rotation
 		rootPart.worldRotation =
 			mul(transform.rotation, mul(rootPart.rotation, quaternion.RotateY(rootPart.spinAngle)) // Apply main object's rotation
 			); // Making a new quaternion every update to avoid floating-point errors with quat multiplication
@@ -155,7 +180,7 @@ class Fractal : MonoBehaviour {
 			scale *= 0.5f;
 
 			jobHandle = new UpdateFractalLevelJob { // Make a job for parts on the current level -- These fields will be the same for all parts on the current level
-				spinAngleDelta = spinAngleDelta,
+				deltaTime = deltaTime,
 				scale = scale,
 				parents = parts[li - 1],
 				parts = parts[li],
@@ -169,24 +194,41 @@ class Fractal : MonoBehaviour {
 		jobHandle.Complete(); // Complete the current JobHandle - the last JobHandle in the sequence. This triggers all previous JobHandles due to the sequential dependancy we built up while scheduling.
 
 		Bounds bounds = new Bounds(rootPart.worldPosition, 3f * objectScale * Vector3.one); // Bound to area around main object
+		int leafIndex = matricesBuffers.Length - 1; // Index of the last layer, i.e. the layer at which we will draw the leaves
 		for (int i = 0; i < matricesBuffers.Length; i++) {
 			ComputeBuffer buffer = matricesBuffers[i];
 
 			buffer.SetData(matrices[i]); // Upload matrix to the GPU
 
-			float gradientInterpolator = i / (matricesBuffers.Length - 1f);
-			propertyBlock.SetColor(colorAId, gradientA.Evaluate(gradientInterpolator));
-			propertyBlock.SetColor(colorBId, gradientB.Evaluate(gradientInterpolator));
+			Color colorA, colorB;
+			Mesh instanceMesh;
+
+			if (i == leafIndex) {
+				colorA = leafColorA;
+				colorB = leafColorB;
+				instanceMesh = leafMesh;
+			}
+			else {
+				float gradientInterpolator = i / (matricesBuffers.Length - 2f); // Gradient ends one step before the end, so we have to subtract two
+				colorA = gradientA.Evaluate(gradientInterpolator);
+				colorB = gradientB.Evaluate(gradientInterpolator);
+				instanceMesh = mesh;
+			}
+			
+			propertyBlock.SetColor(colorAId, colorA);
+			propertyBlock.SetColor(colorBId, colorB);
+
 			propertyBlock.SetVector(sequenceNumbersId, sequenceNumbers[i]);
 			propertyBlock.SetBuffer(matricesId, buffer);
 			Graphics.DrawMeshInstancedProcedural(
-				mesh, 0, material, bounds, buffer.count, propertyBlock // New argument! Use the property block data to procedurally draw meshes
+				instanceMesh, 0, material, bounds, buffer.count, propertyBlock // New argument! Use the property block data to procedurally draw meshes
 			);
 		}
 	}
 
 	FractalPart CreatePart (int childIndex) => new FractalPart {
-		direction = directions[childIndex],
+		maxSagAngle = radians(Random.Range(maxSagAngleA, maxSagAngleB)),
+		spinVelocity = (Random.value < reverseSpinChance ? -1f : 1f) * radians(Random.Range(spinSpeedA, spinSpeedB)),
 		rotation = rotations[childIndex]
 	};
 }
